@@ -505,37 +505,44 @@ let voiceUtterance = null;
 const $ = s => document.querySelector(s);
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 
-async function safeGet(key, shared){ try{ return await window.storage.get(key, shared); } catch(e){ return null; } }
-async function safeSet(key, val, shared){ try{ return await window.storage.set(key, val, shared); } catch(e){ console.error("storage set failed", e); return null; } }
-async function safeDelete(key, shared){ try{ return await window.storage.delete(key, shared); } catch(e){ return null; } }
-
-function todayStr(){
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-}
-function addDays(dateStr, n){
-  const parts = dateStr.split("-").map(Number);
-  const dt = new Date(parts[0], parts[1]-1, parts[2]);
-  dt.setDate(dt.getDate()+n);
-  return dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,"0") + "-" + String(dt.getDate()).padStart(2,"0");
-}
-function dayIndex(){
-  const d = new Date();
-  const start = new Date(d.getFullYear(),0,0);
-  return Math.floor((d - start) / 86400000);
-}
-function verseOfDay(){ return VERSES[dayIndex() % VERSES.length]; }
-
-async function loadUsers(){
-  const raw = await safeGet("bible_users", true);
-  return raw ? JSON.parse(raw.value) : {};
-}
-async function saveCurrentUser(){
-  const users = await loadUsers();
-  users[currentUsername] = currentUser;
-  await safeSet("bible_users", JSON.stringify(users), true);
+async function safeGet(key, shared){ 
+  try { 
+    // If the sandbox storage API is available, use it
+    if (window.storage && typeof window.storage.get === 'function') {
+      return await window.storage.get(key, shared); 
+    }
+    // Fallback to native browser localStorage
+    const val = localStorage.getItem(key);
+    return val !== null ? { value: val } : null;
+  } catch(e) { 
+    return null; 
+  } 
 }
 
+async function safeSet(key, val, shared){ 
+  try { 
+    if (window.storage && typeof window.storage.set === 'function') {
+      return await window.storage.set(key, val, shared); 
+    }
+    localStorage.setItem(key, val);
+    return true;
+  } catch(e) { 
+    console.error("storage set failed", e); 
+    return null; 
+  } 
+}
+
+async function safeDelete(key, shared){ 
+  try { 
+    if (window.storage && typeof window.storage.delete === 'function') {
+      return await window.storage.delete(key, shared); 
+    }
+    localStorage.removeItem(key);
+    return true;
+  } catch(e) { 
+    return null; 
+  } 
+}
 /* ================= THEME TOGGLE ================= */
 const themeToggle = $("#themeToggle");
 themeToggle.addEventListener("click", () => {
